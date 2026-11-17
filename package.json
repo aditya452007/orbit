@@ -81,7 +81,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "aadityathakur",
+      "owner": "aditya452007",
       "repo": "orbit",
       "releaseType": "release"
     },

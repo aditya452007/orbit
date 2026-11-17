@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run win32-launch tests
+        run: npm run test:win32-launch
+
+      - name: Run persistence-shape tests
+        run: npm run test:persistence-shape
+
+      - name: Run radial windowing verification
+        run: npm run verify:radial-windowing
+
+      - name: Build project
+        run: npm run build
+
+  analyze-size:
+    name: Analyze Bundle Size
+    needs: lint-and-test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Analyze packaged app contents
+        run: npx electron-builder --analyze || true
+        continue-on-error: true
