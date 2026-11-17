@@ -6,6 +6,7 @@
 
 A radial launcher for Windows. Hold the middle mouse button anywhere, aim, release.
 
+![Orbit Hero](https://raw.githubusercontent.com/aditya452007/orbit/main/public/orbit-hero.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4?style=flat-square)
 
 </div>
