@@ -15,28 +15,37 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ── 2. Setup Node.js ───────────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
+      # ── 3. Install dependencies ────────────────────────────────────────────
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests before release
-        run: |
-          npm run test:win32-launch
-          npm run test:persistence-shape
-          npm run verify:radial-windowing
+      # ── 4. Run tests before release ────────────────────────────────────────
+      - name: Run win32-launch tests
+        run: npm run test:win32-launch
 
-      - name: Build project
+      - name: Run persistence-shape tests
+        run: npm run test:persistence-shape
+
+      - name: Run radial windowing verification
+        run: npm run verify:radial-windowing
+
+      # ── 5. Build project ───────────────────────────────────────────────────
+      - name: Build project (Vite + electron-builder)
         run: npm run build
 
-      - name: Create release & publish artifacts
+      # ── 6. Create release & publish installer ──────────────────────────────
+      - name: Publish release via electron-builder
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist -- --publish always
