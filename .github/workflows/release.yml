@@ -7,7 +7,6 @@ on:
 
 env:
   NODE_VERSION: "20"
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   build-and-release:
@@ -44,8 +43,8 @@ jobs:
       - name: Build project (Vite + electron-builder)
         run: npm run build
 
-      # ── 6. Create release & publish installer ──────────────────────────────
-      - name: Publish release via electron-builder
+      # ── 6. Publish release via electron-builder ────────────────────────────
+      - name: Publish release to GitHub
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist -- --publish always
