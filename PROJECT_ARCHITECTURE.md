@@ -328,7 +328,79 @@ Applied via `app.commandLine.appendSwitch()` before `app.whenReady()`:
 
 ---
 
-## 8. How to Start Work
+## 8. CI/CD & Release Process
+
+### GitHub Actions Workflows
+
+| Workflow | Triggers | Location |
+|----------|----------|----------|
+| `ci.yml` | Push to `main`, Pull Requests | `.github/workflows/ci.yml` |
+| `release.yml` | Push version tags (`v*.*.*`) | `.github/workflows/release.yml` |
+
+### CI Pipeline (`ci.yml`)
+
+Runs on every push to `main` and every PR:
+
+1. **Checkout** — `actions/checkout@v4`
+2. **Setup Node.js** — `actions/setup-node@v4` (Node 20, with npm cache)
+3. **Install dependencies** — `npm ci`
+4. **Run win32-launch tests** — `npm run test:win32-launch`
+5. **Run persistence-shape tests** — `npm run test:persistence-shape`
+6. **Run radial windowing verification** — `npm run verify:radial-windowing`
+7. **Build project** — `npm run build`
+8. **Analyze bundle size** — `npx electron-builder --analyze`
+
+### Release Pipeline (`release.yml`)
+
+Runs on every version tag push (`git push origin vX.Y.Z`):
+
+1. **Checkout** — `actions/checkout@v4`
+2. **Setup Node.js** — Node 20 with npm cache
+3. **Install dependencies** — `npm ci`
+4. **Run tests** — all three test suites must pass before building
+5. **Build project** — `npm run build`
+6. **Publish release** — `npm run dist -- --publish always`
+
+### How to Make a Release
+
+```bash
+# 1. Bump the version in package.json (e.g., 1.2.6 → 1.2.7)
+# 2. Commit the change
+git commit -m "chore: release v1.2.7"
+
+# 3. Create and push a version tag (this triggers the release pipeline)
+git tag v1.2.7
+git push origin v1.2.7
+```
+
+### What Gets Published
+
+When the release pipeline completes, the GitHub Releases page will contain:
+
+| Asset | Description |
+|-------|-------------|
+| `Orbit-1.2.7.exe` | NSIS installer — users download and run this to install Orbit |
+| `latest.yml` | Auto-updater manifest — installed clients check this for updates |
+
+### Installation Instructions for Users
+
+1. Go to the **Releases** page: `https://github.com/aditya452007/orbit/releases`
+2. Download the latest `Oruit-X.Y.Z.exe` from the assets
+3. Run the installer and follow the wizard
+4. Orbit installs to `%LOCALAPPDATA%\Programs\Orbit\` and creates a Start Menu shortcut
+5. The app auto-updates via the built-in electron-updater (checks GitHub Releases for `latest.yml`)
+
+### Verification
+
+After pushing a tag, check the **Actions** tab:
+`https://github.com/aditya452007/orbit/actions`
+
+If the build succeeds, the **Releases** tab will show the new release:
+`https://github.com/aditya452007/orbit/releases`
+
+---
+
+## 9. How to Start Work
 
 1. Read `PROJECT_ARCHITECTURE.md` (this file)
 2. Read `README.md` and `docs/ARCHITECTURE.md`
