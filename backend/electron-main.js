@@ -926,7 +926,11 @@ let recordingActive = false;
 function startShortcutRecording() {
   if (keyboardListener) return;
 
-  keyboardListener = new GlobalKeyboardListener();
+  keyboardListener = new GlobalKeyboardListener({
+    windows: {
+      serverPath: getResourceBinPath("WinKeyServer.exe"),
+    },
+  });
   recordingActive = true;
 
   keyboardListener.addListener((e, down) => {
@@ -1680,6 +1684,17 @@ const TRIGGER_PASSTHROUGH_SLOP_PX = 6;
 
 function radialMouseBlockerAssetPath() {
   const p = path.join(__dirname, "mouse-blocker.ps1");
+  return isDev ? p : p.replace("app.asar", "app.asar.unpacked");
+}
+
+/**
+ * Resolve a file under resources/bin/ to a real filesystem path.
+ * In production, resources/bin/* is unpacked from app.asar to app.asar.unpacked/,
+ * so we must replace "app.asar" with "app.asar.unpacked" so that child_process
+ * can execute binaries (e.g. WinKeyServer.exe) which cannot run from inside ASAR.
+ */
+function getResourceBinPath(fileName) {
+  const p = path.join(__dirname, "..", "resources", "bin", fileName);
   return isDev ? p : p.replace("app.asar", "app.asar.unpacked");
 }
 
