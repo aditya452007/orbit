@@ -73,7 +73,8 @@
       "backend/*.ps1",
       "resources/bin/**/*",
       "node_modules/sql.js/dist/sql-wasm.wasm",
-      "node_modules/active-win/**/*"
+      "node_modules/active-win/**/*",
+      "node_modules/node-global-key-listener/**/*"
     ],
     "compression": "maximum",
     "directories": {
