@@ -54,13 +54,7 @@ jobs:
       # ── 6. Auto-bump patch version ─────────────────────────────────────────
       - name: Auto-bump patch version
         id: bump
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          NEW=$(node -e "const p='${CURRENT}'.split('.'); p[2]=+p[2]+1; console.log(p.join('.'))")
-          node -e "const fs=require('fs'); const p=require('./package.json'); p.version='${NEW}'; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n')"
-          echo "version=${NEW}" >> $GITHUB_OUTPUT
-          echo "current=${CURRENT}" >> $GITHUB_OUTPUT
-          echo "Auto-bumped version: ${CURRENT} → ${NEW}"
+        run: node scripts/bump-version.mjs
 
       # ── 7. Commit version bump ─────────────────────────────────────────────
       - name: Commit version bump
