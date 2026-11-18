@@ -2,37 +2,46 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches: [main]
 
 env:
   NODE_VERSION: "20"
 
 permissions:
-  contents: write   # Required to create GitHub Releases and upload assets
+  contents: write   # Required to create GitHub Releases, push tags, and upload assets
+  pull-requests: write
 
 jobs:
   build-and-release:
-    name: Build & Release
+    name: Build & Auto-Release
     runs-on: windows-latest
 
     steps:
       # ── 1. Checkout ────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      # ── 2. Setup Node.js ───────────────────────────────────────────────────
+      # ── 2. Configure Git ───────────────────────────────────────────────────
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # ── 3. Setup Node.js ───────────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
-      # ── 3. Install dependencies ────────────────────────────────────────────
+      # ── 4. Install dependencies ────────────────────────────────────────────
       - name: Install dependencies
         run: npm ci
 
-      # ── 4. Run tests before release ────────────────────────────────────────
+      # ── 5. Run tests before release ────────────────────────────────────────
       - name: Run win32-launch tests
         run: npm run test:win32-launch
 
@@ -42,11 +51,49 @@ jobs:
       - name: Run radial windowing verification
         run: npm run verify:radial-windowing
 
-      # ── 5. Build project ───────────────────────────────────────────────────
+      # ── 6. Auto-bump patch version ─────────────────────────────────────────
+      - name: Auto-bump patch version
+        id: bump
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          NEW=$(node -e "const p='${CURRENT}'.split('.'); p[2]=+p[2]+1; console.log(p.join('.'))")
+          node -e "const fs=require('fs'); const p=require('./package.json'); p.version='${NEW}'; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n')"
+          echo "version=${NEW}" >> $GITHUB_OUTPUT
+          echo "current=${CURRENT}" >> $GITHUB_OUTPUT
+          echo "Auto-bumped version: ${CURRENT} → ${NEW}"
+
+      # ── 7. Commit version bump ─────────────────────────────────────────────
+      - name: Commit version bump
+        run: |
+          git add package.json
+          git commit -m "chore: release v${{ steps.bump.outputs.version }} [skip ci]" || echo "Nothing to commit"
+
+      # ── 8. Push version bump to main ───────────────────────────────────────
+      - name: Push version bump
+        run: git push origin main
+
+      # ── 9. Create and push tag ─────────────────────────────────────────────
+      - name: Create and push tag
+        run: |
+          git tag "v${{ steps.bump.outputs.version }}"
+          git push origin "v${{ steps.bump.outputs.version }}"
+
+      # ── 10. Setup Node.js again (fresh for build) ──────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      # ── 11. Install dependencies ───────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 12. Build project ──────────────────────────────────────────────────
       - name: Build project (Vite + electron-builder)
         run: npm run build
 
-      # ── 6. Publish release via electron-builder ────────────────────────────
+      # ── 13. Publish release to GitHub ──────────────────────────────────────
       - name: Publish release to GitHub
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

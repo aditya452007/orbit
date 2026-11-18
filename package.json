@@ -7,7 +7,7 @@
   "description": "Orbit radial launcher",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aadityathakur/orbit.git"
+    "url": "https://github.com/aditya452007/orbit.git"
   },
   "scripts": {
     "dev": "vite",
