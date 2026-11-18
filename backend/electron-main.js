@@ -299,6 +299,29 @@ const getAssetPath = (...paths) => {
   );
 };
 
+/** Returns true when PowerShell is available on this Windows machine. */
+let powershellAvailableCache = null;
+function powershellAvailable() {
+  if (powershellAvailableCache !== null) return powershellAvailableCache;
+  if (process.platform !== "win32") {
+    powershellAvailableCache = false;
+    return false;
+  }
+  const psExe = path.join(
+    process.env.SystemRoot || "C:\\Windows",
+    "System32",
+    "WindowsPowerShell",
+    "v1.0",
+    "powershell.exe",
+  );
+  try {
+    powershellAvailableCache = fs.existsSync(psExe);
+  } catch (_) {
+    powershellAvailableCache = false;
+  }
+  return powershellAvailableCache;
+}
+
 /* ── MRU de IDEs da família VS Code ──────────────────────────────────────────────────────────
  *
  * O nome da pasta de perfil não é o nome do produto e muda entre versões e fabricantes:
@@ -1731,6 +1754,10 @@ function scheduleRadialMouseBlockerRestart() {
 
 function ensureRadialMouseBlocker() {
   if (process.platform !== "win32" || radialMouseBlocker) return;
+  if (!powershellAvailable()) {
+    diagLog("[RadialBlocker] PowerShell not available — mouse trigger disabled");
+    return;
+  }
   radialMouseBlockerReady = false;
   radialMouseBlockerStopping = false;
   const child = spawn(
@@ -2431,6 +2458,10 @@ function getWindowsPowerShellExe() {
 }
 
 function getForegroundContextWindows() {
+  if (!powershellAvailable()) {
+    diagLog("[GameMode] PowerShell not available — returning empty foreground context");
+    return Promise.resolve({ exe: null, title: "", cmdline: "", bounds: null });
+  }
   return new Promise((resolve) => {
     const scriptPath = getAssetPath("get-foreground-exe.ps1");
     try {
@@ -2887,6 +2918,8 @@ powerMonitor.on('on-ac', () => {
 
 app.whenReady().then(async () => {
   if (!gotTheLock) return;
+
+  diagLog(`[Env] Platform=${process.platform} PowerShell=${powershellAvailable() ? 'yes' : 'no'} Packaged=${app.isPackaged}`);
 
   /**
    * Compila/inicializa o helper em repouso; ao abrir o radial o bloqueio entra sem atraso.
@@ -5572,6 +5605,17 @@ ipcMain.on("execute-command", async (event, command, commandType, options = {}) 
       `[Shortcut Simulation] Calling script: ${scriptPath} with VKS: ${vksString}`,
     );
 
+    if (!powershellAvailable() || !fs.existsSync(scriptPath)) {
+      diagLog(`[Shortcut Simulation] PowerShell not available or script missing — skipping key simulation`);
+      if (mainWindow) {
+        mainWindow.webContents.send(
+          "execution-error",
+          "Shortcut simulation unavailable (PowerShell not found)",
+        );
+      }
+      return;
+    }
+
     spawn("powershell", [
       "-NoProfile",
       "-ExecutionPolicy",
@@ -6107,6 +6151,10 @@ function foregroundFocusAssetPath() {
 
 function ensureForegroundFocusHelper() {
   if (process.platform !== "win32" || foregroundFocusHelper) return;
+  if (!powershellAvailable()) {
+    diagLog("[Foreground] PowerShell not available — foreground focus disabled");
+    return;
+  }
   foregroundFocusHelperReady = false;
   const child = spawn(
     "powershell",
@@ -6354,6 +6402,10 @@ ipcMain.on("set-window-opacity", (event, opacity) => {
 
 
 ipcMain.handle("get-onboarding-apps", async () => {
+  if (!powershellAvailable()) {
+    diagLog("[Onboarding] PowerShell not available — returning empty app list");
+    return [];
+  }
   return new Promise((resolve) => {
     const targetApps = ["Chrome", "Edge", "Discord", "Spotify", "Steam", "VS Code", "Visual Studio Code", "Notepad", "Calculadora", "Calculator"];
     const psScriptContent = `
@@ -6392,6 +6444,10 @@ ipcMain.handle("get-onboarding-apps", async () => {
 
 // IPC: Get recommended apps for initial workspace (Discovery)
 ipcMain.handle("get-startup-apps", async () => {
+  if (!powershellAvailable()) {
+    diagLog("[Discovery] PowerShell not available — returning empty app list");
+    return [];
+  }
   return new Promise((resolve) => {
     diagLog("[Discovery] Running Smart Discovery for initial apps...");
 
@@ -7318,30 +7374,32 @@ async function extractIconUncached(filePath) {
     // for file paths made those apps render at a different size and resolution
     // than the packaged apps that always came through the script.
     // spawn + argv, so AUMIDs like Microsoft.X_y!App are not mangled by cmd.exe.
-    const psScript = getAssetPath("extract-icon.ps1");
-    diagLog(`[IconRequest] Trying PowerShell extraction for ${resolvedPath}`);
+    let iconData = null;
+    if (powershellAvailable() && fs.existsSync(getAssetPath("extract-icon.ps1"))) {
+      const psScript = getAssetPath("extract-icon.ps1");
+      diagLog(`[IconRequest] Trying PowerShell extraction for ${resolvedPath}`);
 
-    const iconData = await enqueueIconExtraction(() => new Promise((resolve) => {
-      const chunks = [];
-      const psExe = path.join(
-        process.env.SystemRoot || "C:\\Windows",
-        "System32",
-        "WindowsPowerShell",
-        "v1.0",
-        "powershell.exe",
-      );
-      const child = spawn(
-        fs.existsSync(psExe) ? psExe : "powershell.exe",
-        ["-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-File", psScript, "-Target", resolvedPath],
-        { windowsHide: true },
-      );
-      child.stdout.on("data", (d) => chunks.push(d));
-      child.stderr.on("data", (d) =>
-        diagLog(`[IconRequest] PowerShell stderr: ${String(d).trim()}`),
-      );
-      child.on("error", (err) => {
-        diagLog(`[IconRequest] PowerShell spawn error: ${err.message}`);
-        resolve(null);
+      iconData = await enqueueIconExtraction(() => new Promise((resolve) => {
+        const chunks = [];
+        const psExe = path.join(
+          process.env.SystemRoot || "C:\\Windows",
+          "System32",
+          "WindowsPowerShell",
+          "v1.0",
+          "powershell.exe",
+        );
+        const child = spawn(
+          fs.existsSync(psExe) ? psExe : "powershell.exe",
+          ["-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-File", psScript, "-Target", resolvedPath],
+          { windowsHide: true },
+        );
+        child.stdout.on("data", (d) => chunks.push(d));
+        child.stderr.on("data", (d) =>
+          diagLog(`[IconRequest] PowerShell stderr: ${String(d).trim()}`),
+        );
+        child.on("error", (err) => {
+          diagLog(`[IconRequest] PowerShell spawn error: ${err.message}`);
+          resolve(null);
       });
       child.on("close", (code) => {
         if (code !== 0) {
@@ -7353,6 +7411,7 @@ async function extractIconUncached(filePath) {
         resolve(dataLine || null);
       });
     }));
+    }
 
     if (iconData) {
       diagLog(`[IconRequest] Success via PowerShell for ${filePath}`);
